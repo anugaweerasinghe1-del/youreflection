@@ -9,38 +9,82 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WallRouteImport } from './routes/wall'
+import { Route as ReflectRouteImport } from './routes/reflect'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LetterSessionIdRouteImport } from './routes/letter.$sessionId'
 
+const WallRoute = WallRouteImport.update({
+  id: '/wall',
+  path: '/wall',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReflectRoute = ReflectRouteImport.update({
+  id: '/reflect',
+  path: '/reflect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LetterSessionIdRoute = LetterSessionIdRouteImport.update({
+  id: '/letter/$sessionId',
+  path: '/letter/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/reflect': typeof ReflectRoute
+  '/wall': typeof WallRoute
+  '/letter/$sessionId': typeof LetterSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/reflect': typeof ReflectRoute
+  '/wall': typeof WallRoute
+  '/letter/$sessionId': typeof LetterSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/reflect': typeof ReflectRoute
+  '/wall': typeof WallRoute
+  '/letter/$sessionId': typeof LetterSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/reflect' | '/wall' | '/letter/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/reflect' | '/wall' | '/letter/$sessionId'
+  id: '__root__' | '/' | '/reflect' | '/wall' | '/letter/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ReflectRoute: typeof ReflectRoute
+  WallRoute: typeof WallRoute
+  LetterSessionIdRoute: typeof LetterSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wall': {
+      id: '/wall'
+      path: '/wall'
+      fullPath: '/wall'
+      preLoaderRoute: typeof WallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reflect': {
+      id: '/reflect'
+      path: '/reflect'
+      fullPath: '/reflect'
+      preLoaderRoute: typeof ReflectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +92,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/letter/$sessionId': {
+      id: '/letter/$sessionId'
+      path: '/letter/$sessionId'
+      fullPath: '/letter/$sessionId'
+      preLoaderRoute: typeof LetterSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ReflectRoute: ReflectRoute,
+  WallRoute: WallRoute,
+  LetterSessionIdRoute: LetterSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
