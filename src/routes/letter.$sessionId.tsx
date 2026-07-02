@@ -1,5 +1,4 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getSession, submitWallEntry } from "@/lib/reflection.functions";
@@ -49,22 +48,17 @@ function LetterPage() {
       <Nav />
 
       <section className="mx-auto max-w-3xl px-6 pb-24 pt-40 md:px-10 md:pt-56">
-        <motion.p
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2 }}
-          className="text-[10px] uppercase tracking-[0.5em] text-accent/70"
+        <p
+          className="animate-fade-up text-[10px] uppercase tracking-[0.5em] text-accent/70"
         >
           A letter, for you
-        </motion.p>
-        <motion.h1
-          initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 1.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display mt-10 text-balance text-[clamp(2.5rem,6vw,5rem)] leading-[1.02] italic"
+        </p>
+        <h1
+          className="font-display animate-fade-up mt-10 text-balance text-[clamp(2.5rem,6vw,5rem)] leading-[1.02] italic"
+          style={{ animationDelay: "300ms" }}
         >
           {letter.title}
-        </motion.h1>
+        </h1>
 
         <div className="mt-16 flex items-center gap-6 text-[10px] uppercase tracking-[0.35em]">
           {(["letter", "insights"] as const).map((t) => (
@@ -114,12 +108,10 @@ function LetterBody({ letter }: { letter: ReturnType<typeof Route.useLoaderData>
   return (
     <article className="space-y-16">
       {sections.map((s, i) => (
-        <motion.div
+        <div
           key={i}
-          initial={{ opacity: 0, y: 20, filter: "blur(6px)" }}
-          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          viewport={{ once: true, margin: "-10%" }}
-          transition={{ duration: 1.1, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+          className="animate-fade-up"
+          style={{ animationDelay: `${i * 50}ms` }}
         >
           {s.label && (
             <p className="mb-6 text-[10px] uppercase tracking-[0.4em] text-accent/60">{s.label}</p>
@@ -131,7 +123,7 @@ function LetterBody({ letter }: { letter: ReturnType<typeof Route.useLoaderData>
           >
             {s.body}
           </p>
-        </motion.div>
+        </div>
       ))}
     </article>
   );
@@ -151,13 +143,10 @@ function Insights({ insights }: { insights: ReturnType<typeof Route.useLoaderDat
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden border border-border md:grid-cols-2">
       {cards.map((c, i) => (
-        <motion.div
+        <div
           key={c.title}
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-10%" }}
-          transition={{ duration: 0.9, delay: (i % 4) * 0.06 }}
-          className="bg-surface p-8 md:p-10"
+          className="animate-fade-up bg-surface p-8 md:p-10"
+          style={{ animationDelay: `${(i % 4) * 60}ms` }}
         >
           <p className="text-[10px] uppercase tracking-[0.35em] text-accent/70">{c.title}</p>
           {c.kind === "list" ? (
@@ -173,7 +162,7 @@ function Insights({ insights }: { insights: ReturnType<typeof Route.useLoaderDat
               {c.body as string}
             </p>
           )}
-        </motion.div>
+        </div>
       ))}
     </div>
   );
@@ -213,13 +202,11 @@ function WallInvitation() {
         </h2>
 
         {state === "sent" ? (
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-12 font-display text-2xl italic text-foreground/90"
+          <p
+            className="font-display mt-12 animate-fade-up text-2xl italic text-foreground/90"
           >
             Thank you. Your sentence has been added to the wall.
-          </motion.p>
+          </p>
         ) : (
           <div className="mt-12">
             <textarea
