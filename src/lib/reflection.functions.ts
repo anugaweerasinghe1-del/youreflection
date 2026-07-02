@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 
 const AnswersSchema = z.record(z.string(), z.union([z.string(), z.number()]));
 
@@ -39,6 +39,8 @@ Your writing is quiet, elegant, deeply human, warm, calm, and hopeful — the wa
 
 Address the reader as "you". Keep sentences varied and unhurried. Do not repeat the reader's answers back verbatim — weave what they shared into observations. Never invent facts they didn't share.
 
+Return only valid JSON. Do not wrap it in markdown. Do not add commentary before or after the JSON.
+
 Return two things:
 
 1. LETTER — a personal reflection letter with these parts (each 2–5 sentences, except reflection which may be 4–8):
@@ -61,10 +63,23 @@ Return two things:
 
 Never mention this schema. Never break character. Never begin the letter with "Based on your answers".`;
 
+function parseJsonObject<T>(text: string, schema: z.ZodType<T>): T {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1];
+  const candidate = fenced ?? trimmed;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("The AI response was not valid JSON.");
+  }
+  return schema.parse(JSON.parse(candidate.slice(start, end + 1)));
+}
+
 export const generateLetter = createServerFn({ method: "POST" })
-  .inputValidator((data: { answers: Record<string, string | number> }) => ({
-    answers: AnswersSchema.parse(data.answers),
-  }))
+  .validator((data: unknown) => {
+    const parsed = z.object({ answers: AnswersSchema }).parse(data);
+    return { answers: parsed.answers };
+  })
   .handler(async ({ data }) => {
     const { createGateway, REFLECTION_MODEL } = await import("./ai-gateway.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -78,12 +93,13 @@ export const generateLetter = createServerFn({ method: "POST" })
       .join("\n");
 
     try {
-      const { object } = await generateObject({
+      const { text } = await generateText({
         model,
-        schema: OutputSchema,
         system: SYSTEM_PROMPT,
-        prompt: `Here is what the reader shared. Write their reflection letter and insights.\n\n${formatted}`,
+        prompt: `Here is what the reader shared. Write their reflection letter and insights as a JSON object with exactly this shape: {"letter":{"title":"","greeting":"","reflection":"","hiddenStrengths":"","thinkingPatterns":"","gentlePerspective":"","smallChallenge":"","questionToCarry":"","closing":""},"insights":{"strengths":[],"values":[],"thoughtPatterns":[],"growthAreas":[],"confidenceNote":"","selfCompassionNote":"","comparisonNote":"","innerDialogueNote":""}}.\n\n${formatted}`,
+        maxRetries: 1,
       });
+      const object = parseJsonObject(text, OutputSchema);
 
       const { data: inserted, error } = await supabaseAdmin
         .from("reflection_sessions")
@@ -110,7 +126,7 @@ export const generateLetter = createServerFn({ method: "POST" })
   });
 
 export const getSession = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => ({ id: z.string().uuid().parse(data.id) }))
+  .validator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
@@ -139,7 +155,7 @@ Approve messages that are supportive, honest, human, and offer perspective or ki
 
 Reject only if the message contains: hate or slurs, encouragement of self-harm or suicide, sexual content, threats, personal identifying information (names, emails, phone numbers, addresses, social handles), spam, advertising, gibberish, or is longer than roughly 200 characters.
 
-Return concise JSON.`;
+Return only concise valid JSON. Do not wrap it in markdown.`;
 
 const ModSchema = z.object({
   decision: z.enum(["approve", "reject"]),
@@ -148,9 +164,10 @@ const ModSchema = z.object({
 });
 
 export const submitWallEntry = createServerFn({ method: "POST" })
-  .inputValidator((data: { message: string }) => ({
-    message: z.string().min(4).max(240).parse(data.message.trim()),
-  }))
+  .validator((data: unknown) => {
+    const parsed = z.object({ message: z.string().trim().min(4).max(240) }).parse(data);
+    return { message: parsed.message };
+  })
   .handler(async ({ data }) => {
     const { createGateway, REFLECTION_MODEL } = await import("./ai-gateway.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -163,12 +180,13 @@ export const submitWallEntry = createServerFn({ method: "POST" })
     let cleaned = data.message;
 
     try {
-      const { object } = await generateObject({
+      const { text } = await generateText({
         model,
-        schema: ModSchema,
         system: MOD_SYSTEM,
-        prompt: `Message: """${data.message}"""`,
+        prompt: `Return JSON with exactly this shape: {"decision":"approve","reason":"","cleaned_message":""}. Message: """${data.message}"""`,
+        maxRetries: 1,
       });
+      const object = parseJsonObject(text, ModSchema);
       decision = object.decision;
       reason = object.reason;
       cleaned = object.cleaned_message?.trim() || data.message;

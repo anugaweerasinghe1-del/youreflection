@@ -1,0 +1,1 @@
+CREATE POLICY "reflection sessions are server only" ON public.reflection_sessions FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);

@@ -293,27 +293,11 @@ function Journey() {
           </h2>
         </Reveal>
 
-        <div className="mt-32 space-y-40">
+        <div className="mt-24 space-y-10 md:mt-32 md:space-y-16">
           {steps.map((s, i) => (
-            <div
-              key={i}
-              className={`grid grid-cols-1 items-center gap-12 md:grid-cols-12 ${
-                i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
-              }`}
-            >
-              <Reveal>
-                <ParallaxImage src={s.img} />
-              </Reveal>
-              <Reveal delay={0.1} className="md:col-span-5">
-                <p className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground">
-                  {String(i + 1).padStart(2, "0")}
-                </p>
-                <h3 className="font-display mt-6 text-[clamp(1.75rem,3vw,2.75rem)] leading-tight text-balance">
-                  {s.k}
-                </h3>
-                <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">{s.d}</p>
-              </Reveal>
-            </div>
+            <Reveal key={i} delay={i * 0.08}>
+              <ParallaxImage src={s.img} index={i} title={s.k} body={s.d} />
+            </Reveal>
           ))}
         </div>
       </div>
@@ -321,22 +305,42 @@ function Journey() {
   );
 }
 
-function ParallaxImage({ src }: { src: string }) {
+function ParallaxImage({
+  src,
+  index,
+  title,
+  body,
+}: {
+  src: string;
+  index: number;
+  title: string;
+  body: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["-8%", "8%"]);
+  const y = useTransform(scrollYProgress, [0, 1], ["-5%", "5%"]);
   const scale = useTransform(scrollYProgress, [0, 0.5, 1], [1.05, 1, 1.05]);
 
   return (
-    <div ref={ref} className="relative aspect-[4/5] w-full overflow-hidden bg-surface md:col-span-7">
+    <div ref={ref} className="relative min-h-[68vh] w-full overflow-hidden bg-surface md:min-h-[76vh]">
       <motion.img
         src={src}
         alt=""
         loading="lazy"
         style={{ y, scale }}
-        className="h-full w-full object-cover"
+        className="absolute inset-0 h-[112%] w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-transparent to-background/40" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/35 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/25 via-transparent to-background/55" />
+      <div className="absolute inset-x-0 bottom-0 p-8 md:p-14">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-accent/75">
+          {String(index + 1).padStart(2, "0")}
+        </p>
+        <h3 className="font-display mt-6 max-w-2xl text-balance text-[clamp(2rem,4vw,4rem)] leading-[1.04]">
+          {title}
+        </h3>
+        <p className="mt-6 max-w-lg text-base leading-relaxed text-foreground/75">{body}</p>
+      </div>
     </div>
   );
 }

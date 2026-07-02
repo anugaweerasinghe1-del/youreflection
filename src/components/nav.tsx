@@ -6,15 +6,15 @@ export function Nav() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 md:px-10">
         <Link
           to="/"
-          className="text-[10px] uppercase tracking-[0.4em] text-white/70 transition hover:text-white"
+          className="text-[10px] uppercase tracking-[0.4em] text-foreground/70 transition hover:text-foreground"
         >
           Beyond
         </Link>
-        <nav className="flex items-center gap-8 text-[10px] uppercase tracking-[0.35em] text-white/60">
-          <Link to="/reflect" className="transition hover:text-white [&.active]:text-white">
+        <nav className="flex items-center gap-8 text-[10px] uppercase tracking-[0.35em] text-foreground/60">
+          <Link to="/reflect" className="transition hover:text-foreground [&.active]:text-foreground">
             Reflect
           </Link>
-          <Link to="/wall" className="transition hover:text-white [&.active]:text-white">
+          <Link to="/wall" className="transition hover:text-foreground [&.active]:text-foreground">
             Wall
           </Link>
         </nav>
