@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reflection_sessions: {
+        Row: {
+          answers: Json
+          created_at: string
+          id: string
+          insights: Json
+          letter: Json
+        }
+        Insert: {
+          answers: Json
+          created_at?: string
+          id?: string
+          insights: Json
+          letter: Json
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          id?: string
+          insights?: Json
+          letter?: Json
+        }
+        Relationships: []
+      }
+      wall_entries: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          moderation_reason: string | null
+          status: Database["public"]["Enums"]["wall_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          moderation_reason?: string | null
+          status?: Database["public"]["Enums"]["wall_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          moderation_reason?: string | null
+          status?: Database["public"]["Enums"]["wall_status"]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +70,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      wall_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +197,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      wall_status: ["pending", "approved", "rejected"],
+    },
   },
 } as const
