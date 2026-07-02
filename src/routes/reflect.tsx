@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QUESTIONS, type Question } from "@/lib/questions";
@@ -99,18 +98,10 @@ function ReflectPage() {
       <TopBar current={i} total={total} onExit={() => navigate({ to: "/" })} />
 
       <main className="relative flex flex-1 items-center justify-center px-6 py-32 md:px-10">
-        <AnimatePresence mode="wait">
-          {submitting ? (
-            <Composing key="composing" />
-          ) : (
-            <motion.div
-              key={q.id}
-              initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
-              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-3xl"
-            >
+        {submitting ? (
+          <Composing />
+        ) : (
+          <div key={q.id} className="animate-fade-up w-full max-w-3xl">
               <p className="text-[10px] uppercase tracking-[0.4em] text-accent/70">
                 {q.category}
               </p>
@@ -125,9 +116,8 @@ function ReflectPage() {
               {error && (
                 <p className="mt-8 text-sm text-destructive">{error}</p>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </main>
 
       {!submitting && (
@@ -403,32 +393,17 @@ function Composing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="max-w-2xl text-center"
-    >
-      <motion.div
+    <div className="animate-fade-up max-w-2xl text-center">
+      <div
         aria-hidden
-        className="mx-auto h-[1px] w-24 origin-center bg-foreground/60"
-        animate={{ scaleX: [0.4, 1, 0.4], opacity: [0.4, 1, 0.4] }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        className="mx-auto h-[1px] w-24 origin-center animate-pulse-line bg-foreground/60"
       />
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={line}
-          initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
-          transition={{ duration: 0.9 }}
-          className="font-display mt-14 text-3xl italic text-foreground/85 md:text-4xl"
-        >
-          {lines[line]}
-        </motion.p>
-      </AnimatePresence>
+      <p className="font-display mt-14 animate-fade-up text-3xl italic text-foreground/85 md:text-4xl">
+        {lines[line]}
+      </p>
       <p className="mt-10 text-xs uppercase tracking-[0.35em] text-muted-foreground">
         This can take up to a minute.
       </p>
-    </motion.div>
+    </div>
   );
 }

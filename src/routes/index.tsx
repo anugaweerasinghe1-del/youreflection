@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Nav } from "@/components/nav";
 import heroPortrait from "@/assets/hero-portrait.jpg";
@@ -57,11 +56,9 @@ function Hero() {
   return (
     <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-background">
       {/* Portrait fade-in */}
-      <motion.div
-        className="absolute inset-0"
-        initial={{ opacity: 0, scale: 1.08 }}
-        animate={{ opacity: phase >= 2 ? 1 : 0, scale: phase >= 2 ? 1 : 1.08 }}
-        transition={{ duration: 4, ease: [0.22, 1, 0.36, 1] }}
+      <div
+        className="absolute inset-0 transition-[opacity,transform] duration-[4000ms] ease-out"
+        style={{ opacity: phase >= 2 ? 1 : 0, transform: `scale(${phase >= 2 ? 1 : 1.08})` }}
       >
         <img
           src={heroPortrait}
@@ -72,64 +69,51 @@ function Hero() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-transparent to-background" />
-      </motion.div>
+      </div>
 
       {/* Opening lines */}
       <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-start px-6 md:px-10">
         {phase < 2 && (
           <div className="min-h-[60vh] flex flex-col justify-center gap-6">
-            <motion.p
-              initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
-              className="font-display text-3xl italic text-foreground/90 md:text-5xl"
+            <p
+              className="font-display animate-fade-up text-3xl italic text-foreground/90 md:text-5xl"
             >
               The longest conversation you'll ever have…
-            </motion.p>
-            <motion.p
-              initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-              animate={{ opacity: phase >= 1 ? 1 : 0, y: phase >= 1 ? 0 : 8 }}
-              transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
-              className="font-display text-3xl italic text-foreground/80 md:text-5xl"
+            </p>
+            <p
+              className="font-display text-3xl italic text-foreground/80 transition-all duration-[1600ms] ease-out md:text-5xl"
+              style={{ opacity: phase >= 1 ? 1 : 0, transform: `translateY(${phase >= 1 ? 0 : 8}px)` }}
             >
               is the one you have with yourself.
-            </motion.p>
+            </p>
           </div>
         )}
 
         {phase >= 2 && (
           <div className="flex flex-col items-start gap-8 py-24 md:py-32">
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1.4, delay: 0.2 }}
-              className="text-[10px] uppercase tracking-[0.5em] text-accent/80"
+            <p
+              className="animate-fade-up text-[10px] uppercase tracking-[0.5em] text-accent/80"
+              style={{ animationDelay: "200ms" }}
             >
               A Reflection Experience
-            </motion.p>
-            <motion.h1
-              initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 2, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="font-display max-w-4xl text-balance text-[clamp(3rem,9vw,7.5rem)] leading-[0.95] text-foreground"
+            </p>
+            <h1
+              className="font-display animate-fade-up max-w-4xl text-balance text-[clamp(3rem,9vw,7.5rem)] leading-[0.95] text-foreground"
+              style={{ animationDelay: "400ms" }}
             >
               Beyond<br />
               <span className="italic text-foreground/85">what you see.</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1.4, delay: 1.2 }}
-              className="max-w-xl text-balance text-base leading-relaxed text-muted-foreground md:text-lg"
+            </h1>
+            <p
+              className="animate-fade-up max-w-xl text-balance text-base leading-relaxed text-muted-foreground md:text-lg"
+              style={{ animationDelay: "1200ms" }}
             >
               An AI-powered reflection experience designed to help you understand
               yourself — not judge yourself.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: phase >= 3 ? 1 : 0 }}
-              transition={{ duration: 1.4 }}
-              className="mt-6"
+            </p>
+            <div
+              className="mt-6 transition-opacity duration-[1400ms]"
+              style={{ opacity: phase >= 3 ? 1 : 0 }}
             >
               <Link
                 to="/reflect"
@@ -138,20 +122,17 @@ function Hero() {
                 Begin Reflection
                 <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
               </Link>
-            </motion.div>
+            </div>
           </div>
         )}
       </div>
 
       {phase >= 3 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.6 }}
-          transition={{ duration: 2, delay: 0.5 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-muted-foreground"
+        <div
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-muted-foreground opacity-60 transition-opacity duration-[2000ms]"
         >
           scroll ↓
-        </motion.div>
+        </div>
       )}
     </section>
   );
@@ -293,27 +274,11 @@ function Journey() {
           </h2>
         </Reveal>
 
-        <div className="mt-32 space-y-40">
+        <div className="mt-24 space-y-10 md:mt-32 md:space-y-16">
           {steps.map((s, i) => (
-            <div
-              key={i}
-              className={`grid grid-cols-1 items-center gap-12 md:grid-cols-12 ${
-                i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
-              }`}
-            >
-              <Reveal>
-                <ParallaxImage src={s.img} />
-              </Reveal>
-              <Reveal delay={0.1} className="md:col-span-5">
-                <p className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground">
-                  {String(i + 1).padStart(2, "0")}
-                </p>
-                <h3 className="font-display mt-6 text-[clamp(1.75rem,3vw,2.75rem)] leading-tight text-balance">
-                  {s.k}
-                </h3>
-                <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">{s.d}</p>
-              </Reveal>
-            </div>
+            <Reveal key={i} delay={i * 0.08}>
+              <ParallaxImage src={s.img} index={i} title={s.k} body={s.d} />
+            </Reveal>
           ))}
         </div>
       </div>
@@ -321,22 +286,36 @@ function Journey() {
   );
 }
 
-function ParallaxImage({ src }: { src: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["-8%", "8%"]);
-  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [1.05, 1, 1.05]);
-
+function ParallaxImage({
+  src,
+  index,
+  title,
+  body,
+}: {
+  src: string;
+  index: number;
+  title: string;
+  body: string;
+}) {
   return (
-    <div ref={ref} className="relative aspect-[4/5] w-full overflow-hidden bg-surface md:col-span-7">
-      <motion.img
+    <div className="relative min-h-[68vh] w-full overflow-hidden bg-surface md:min-h-[76vh]">
+      <img
         src={src}
         alt=""
         loading="lazy"
-        style={{ y, scale }}
-        className="h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full scale-[1.04] object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-transparent to-background/40" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/35 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/25 via-transparent to-background/55" />
+      <div className="absolute inset-x-0 bottom-0 p-8 md:p-14">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-accent/75">
+          {String(index + 1).padStart(2, "0")}
+        </p>
+        <h3 className="font-display mt-6 max-w-2xl text-balance text-[clamp(2rem,4vw,4rem)] leading-[1.04]">
+          {title}
+        </h3>
+        <p className="mt-6 max-w-lg text-base leading-relaxed text-foreground/75">{body}</p>
+      </div>
     </div>
   );
 }
@@ -471,14 +450,11 @@ export function Reveal({
   className?: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, margin: "-15%" }}
-      transition={{ duration: 1.1, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={className}
+    <div
+      className={`animate-fade-up ${className ?? ""}`}
+      style={{ animationDelay: `${delay}s` }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

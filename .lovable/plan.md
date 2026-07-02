@@ -1,101 +1,119 @@
-# Beyond What You See — Build Plan
+# Build Recovery Plan
 
-A cinematic, Awwwards-caliber self-reflection experience. Dark mode only, editorial typography, one seamless emotional journey from landing → 40-question reflection → AI-written letter → insight dashboard → anonymous community wall.
+## Goal
 
-## Scope (one pass)
+Stabilize the entire project before adding anything else: one clean dependency graph, one working route tree, one safe backend path, and a verified user flow from landing → reflection → AI letter → wall.
 
-1. Landing (hero + 6 story sections + final CTA)
-2. Cinematic reflection questionnaire (40 questions, one-per-screen)
-3. AI-generated personal reflection letter (Gemini)
-4. Reflection dashboard (8 insight cards)
-5. Community Reflection Wall (submit + browse, auto-moderated)
-6. Zero-account privacy model
+## Phase 1 — Freeze and audit the failure surface
 
-## Visual system
+- Stop reactive one-error-at-a-time fixes.
+- Compare all imports against installed packages and real files.
+- Treat these as release blockers:
+  - missing npm packages or mismatched package versions
+  - route files that do not match TanStack route IDs
+  - server-only code reachable from the browser bundle
+  - generated files edited manually
+  - backend policies that expose more data than intended
+  - root metadata or font loading that can break SSR/runtime
 
-- Backgrounds: `#050505` / `#101010` / `#171717`
-- Text: warm white `#F5F1EA`, soft grey `#8A857D`, champagne accent `#C9A96E` (used ~1% of surface)
-- Type: Instrument Serif (display headlines, tracking-tight) + Inter (body). No decorative fonts.
-- Motion: Framer Motion. Slow fades (600–1200ms), text mask reveals, Ken Burns on hero portrait, parallax on section imagery, blur-in transitions between questionnaire screens. Nothing bouncy.
-- Imagery: cinematic editorial portraits (half-lit faces, silhouettes, reflections) generated via image gen, always with dark gradient overlay for text legibility.
-- Layout: generous whitespace, single-column hero, asymmetric editorial rows, no card grids on marketing sections.
+## Phase 2 — Dependency stabilization
 
-## Page / route structure (TanStack Start)
+- Lock the AI stack to a compatible set:
+  - `ai`
+  - `@ai-sdk/openai-compatible`
+  - the existing TanStack Start/Vite versions
+- Remove unused heavy packages if they were added accidentally.
+- Keep `framer-motion` only because it is actively used.
+- Make sure every package import in source code exists in `package.json`.
+- Avoid `@fontsource` unless the package is installed; current safer approach is Google Fonts via root `head()` links.
 
-```
-src/routes/
-  __root.tsx              // dark shell, font preload, meta
-  index.tsx               // landing (hero + 6 sections + CTA)
-  reflect.tsx             // cinematic questionnaire flow
-  letter.$sessionId.tsx   // AI reflection letter + dashboard tabs
-  wall.tsx                // community reflection wall
-  api/public/wall.ts      // GET approved entries (public read)
-```
+## Phase 3 — TanStack Start routing cleanup
 
-Each route sets its own `head()` with unique title/description/OG.
+- Do not manually edit `src/routeTree.gen.ts`; let TanStack regenerate it.
+- Confirm route strings match files exactly:
+  - `src/routes/index.tsx` → `/`
+  - `src/routes/reflect.tsx` → `/reflect`
+  - `src/routes/letter.$sessionId.tsx` → `/letter/$sessionId`
+  - `src/routes/wall.tsx` → `/wall`
+- Confirm the root shell keeps:
+  - `<HeadContent />`
+  - `<Outlet />`
+  - `<Scripts />`
+  - `QueryClientProvider`
+- Add/keep route-level error and not-found handling where loaders exist.
 
-## Data & backend (Lovable Cloud)
+## Phase 4 — Server function hardening
 
-Tables (all with GRANTs + RLS):
+- Keep `src/lib/reflection.functions.ts` thin and client-safe at module scope.
+- Keep all backend/admin imports inside `.handler()` bodies only.
+- Keep `src/lib/ai-gateway.server.ts` server-only and never import it from route components.
+- Add graceful fallback errors for:
+  - missing Lovable AI key
+  - AI generation failure
+  - backend insert/read failure
+  - moderation failure
+- Confirm no protected/auth-only server function is called from a public loader.
 
-- `reflection_sessions` — `id uuid pk`, `created_at`, `answers jsonb`, `letter jsonb`, `insights jsonb`. Anonymous. Public INSERT + SELECT by id (via server fn only).
-- `wall_entries` — `id`, `created_at`, `message text`, `status text` (`pending`|`approved`|`rejected`), `moderation_reason text`. Public reads restricted to `status='approved'`.
+## Phase 5 — AI Gateway compatibility fix
 
-Server functions (`src/lib/*.functions.ts`):
+- Verify the AI SDK call shape matches the installed SDK version.
+- If structured object generation is unstable with the current Google Gemini gateway route, switch to a safer pattern:
+  - ask Gemini for strict JSON text
+  - parse and validate with Zod server-side
+  - fall back to a safe human-written error if validation fails
+- Keep Gemini as the provider through the Lovable AI Gateway.
+- Never expose keys or AI configuration to the browser.
 
-- `generateLetter({ answers })` → calls Gemini via Lovable AI Gateway (`google/gemini-3-flash-preview`), returns structured `{ letter, insights }`, persists to `reflection_sessions`, returns `sessionId`.
-- `getSession({ id })` → fetch letter+insights for the letter route.
-- `submitWallEntry({ message })` → runs Gemini moderation pass (safety + on-topic + length), sets status accordingly, inserts.
-- `listWallEntries({ cursor })` → paginated approved entries (also exposed via public server route for SSR).
+## Phase 6 — Backend and privacy correction
 
-All AI calls go through Lovable AI Gateway with `LOVABLE_API_KEY` (auto-provisioned). This satisfies the "Gemini" requirement — the gateway routes to Google's Gemini models — without asking the user to paste an API key. Fully server-side; key never touches the browser.
+- The reflection experience is meant to be private-by-link through server functions, not publicly listable.
+- Fix backend access so anonymous/browser clients cannot directly read all reflection sessions.
+- Keep wall entries publicly readable only when approved.
+- Keep wall submission and moderation server-side.
+- Ensure every migration that creates a public table has explicit grants and RLS policies.
+- Add a corrective migration rather than editing old migrations that may already have run.
 
-## AI reflection engine
+## Phase 7 — CSS, fonts, and SSR safety
 
-Single system prompt built from the user's spec (positive psych, self-compassion, ACT, CBT reframing, motivational interviewing; never diagnose/label/shame). Uses AI SDK `generateText` + `Output.object` with a Zod schema producing:
+- Keep all CSS package imports at the top of `src/styles.css`.
+- Keep remote fonts in `src/routes/__root.tsx` links, not CSS `@import`.
+- Remove negative letter-spacing from global heading utilities if it conflicts with the design rules.
+- Confirm all styles use semantic tokens and avoid fragile hardcoded theme colors in components where practical.
 
-```
-{
-  letter: { title, greeting, reflection, hiddenStrengths,
-            thinkingPatterns, gentlePerspective, smallChallenge,
-            questionToCarry, closing },
-  insights: {
-    strengths[], values[], thoughtPatterns[], growthAreas[],
-    confidenceNote, selfCompassionNote,
-    comparisonNote, innerDialogueNote
-  }
-}
-```
+## Phase 8 — Performance and UX risk reduction
 
-Frontend renders the letter as a long-form editorial piece; dashboard renders insights as 8 minimal cards.
+- Keep the cinematic feel but reduce build/runtime risk:
+  - no unnecessary libraries
+  - no blocking AI calls before user submission
+  - lazy-load non-critical imagery
+  - preserve reduced-motion behavior where needed
+- Check the main bundle size after stabilization; if still too large, split motion-heavy sections into route-local components rather than adding new packages.
 
-## Questionnaire (40 questions)
+## Phase 9 — Verification gates
 
-Categories: Identity, Confidence, Appearance, Comparison, Relationships, Self-worth, Purpose, Kindness, Growth, Dreams, Social Media, Self-Compassion. Mix of open text, multiple choice, sliders (1–10), and short reflection prompts. Questions written in the thoughtful, non-clinical voice from the brief ("What is something you wish people noticed about you beyond your appearance?").
+- Dependency/import scan: no unresolved imports.
+- Type safety: no invalid route links or server/client import boundary violations.
+- Build validation: the harness should complete without module-resolution, SSR, or type errors.
+- Browser smoke test:
+  - home page renders
+  - `/reflect` advances through inputs
+  - final submit shows a controlled loading/error state if AI/backend is unavailable
+  - `/wall` renders without crashing
+  - invalid `/letter/:id` shows the not-found state
 
-UX: one question per full-viewport screen, blur-out/in transitions, tiny dot progress indicator, Enter to advance, back arrow allowed, autosave to `sessionStorage` so refresh doesn't lose progress. No account, no email.
+## Implementation order
 
-## Community wall
+1. Fix dependency and import graph first.
+2. Fix route/tree and root shell second.
+3. Fix server function and AI Gateway compatibility third.
+4. Fix backend privacy policy with a corrective migration fourth.
+5. Run the smoke flow and address only remaining concrete failures.
 
-- Prompt at end of letter: "If you could tell one struggling person one sentence, what would it be?"
-- Submission runs through Gemini moderation (reject: hate/self-harm-encouragement/spam/PII; accept: supportive humanity). Approved entries appear on `/wall`.
-- Wall UI: typography only, huge quiet spacing, slow fade-in as they enter viewport, no avatars/likes/comments.
+## Expected outcome
 
-## Privacy
-
-- No auth, no email, no name. Session id is a random uuid stored in `sessionStorage` + as URL param on the letter page (user can revisit if they keep the link).
-- Copy throughout reinforces anonymity.
-- Analytics: none by default.
-
-## Technical notes
-
-- Framer Motion for all transitions; `prefers-reduced-motion` respected.
-- Fonts via `@fontsource/instrument-serif` + `@fontsource/inter`.
-- All colors as semantic tokens in `src/styles.css` (oklch), no hardcoded hex in components.
-- Images: generated hero + section portraits saved under `src/assets/`, lazy-loaded, WebP.
-- Lighthouse target ≥95: code split by route, defer AI call until user submits, no heavy libs beyond framer-motion.
-- Full mobile parity — questionnaire, letter, and wall all designed mobile-first.
-
-## Deliverable
-
-One complete build in this pass: landing, reflection flow, AI letter, dashboard, community wall, backend, moderation. Ready to publish.
+A stable, publishable baseline where the app builds reliably, the cinematic frontend still works, Gemini-powered reflection remains server-side, and the private reflection data model no longer creates hidden release risk.  
+  
+IMPORTANT NOTE:  
+Reduce the 39 questions, to a maximum of 15 - even if you are doing 15, ensure that you add mcq, or anything and don't make all questions typing answers, because if we look at it from a realistic standpoint, they will not answer that much because humans are lazy.  
+  
+2nd point is that the images in the home page except the main one in the very top, are small and doesnt show clearly. Fix all these issues, and add them as overlayed images dont do too much, prioritize the minmalism > complexity, etc..ask any questions if necessary
