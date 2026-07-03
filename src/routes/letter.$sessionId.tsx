@@ -209,7 +209,7 @@ function LetterBody({ letter }: { letter: Letter }) {
   );
 }
 
-function Insights({ insights }: { insights: ReturnType<typeof Route.useLoaderData>["insights"] }) {
+function InsightsView({ insights }: { insights: Insights }) {
   const cards: Array<{ title: string; kind: "list" | "note"; body: string[] | string }> = [
     { title: "Strengths", kind: "list", body: insights.strengths },
     { title: "Values", kind: "list", body: insights.values },
