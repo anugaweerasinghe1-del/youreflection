@@ -1,8 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getSession, submitWallEntry } from "@/lib/reflection.functions";
 import { Nav } from "@/components/nav";
+
+const INLINE_KEY = "bwys.letter.inline.v1";
+
+type LetterData = Awaited<ReturnType<typeof getSession>>;
 
 export const Route = createFileRoute("/letter/$sessionId")({
   head: () => ({
@@ -16,10 +20,15 @@ export const Route = createFileRoute("/letter/$sessionId")({
     ],
   }),
   loader: async ({ params }) => {
+    // Inline preview path — data is stashed client-side, load lazily.
+    if (params.sessionId === "preview") return null;
     try {
       return await getSession({ data: { id: params.sessionId } });
-    } catch {
-      throw notFound();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "not_found") throw notFound();
+      // temporarily_unavailable or anything else: render a soft error, not a 404.
+      return { __error: true } as unknown as LetterData;
     }
   },
   component: LetterPage,
@@ -38,6 +47,7 @@ export const Route = createFileRoute("/letter/$sessionId")({
     </div>
   ),
 });
+
 
 function LetterPage() {
   const { letter, insights } = Route.useLoaderData();
