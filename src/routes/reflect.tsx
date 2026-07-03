@@ -67,19 +67,28 @@ function ReflectPage() {
     [q.id],
   );
 
-  const next = useCallback(async () => {
-    if (!canAdvance || submitting) return;
-    if (i < total - 1) {
-      setI((n) => n + 1);
-      return;
-    }
-    // Submit
+  const submit = useCallback(async () => {
     setSubmitting(true);
     setError(null);
     try {
       const res = await generate({ data: { answers } });
-      sessionStorage.removeItem(STORAGE_KEY);
-      navigate({ to: "/letter/$sessionId", params: { sessionId: res.sessionId } });
+      if (res.sessionId) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        navigate({ to: "/letter/$sessionId", params: { sessionId: res.sessionId } });
+        return;
+      }
+      // Persistence failed but we still have the letter — stash it and open inline preview.
+      try {
+        sessionStorage.setItem(
+          "bwys.letter.inline.v1",
+          JSON.stringify({ letter: res.letter, insights: res.insights }),
+        );
+        sessionStorage.removeItem(STORAGE_KEY);
+        navigate({ to: "/letter/$sessionId", params: { sessionId: "preview" } });
+      } catch {
+        setError("Your letter was written but couldn't be saved. Please try again.");
+        setSubmitting(false);
+      }
     } catch (e) {
       console.error(e);
       setError(
@@ -87,11 +96,23 @@ function ReflectPage() {
       );
       setSubmitting(false);
     }
-  }, [answers, canAdvance, generate, i, navigate, submitting, total]);
+  }, [answers, generate, navigate]);
+
+  const next = useCallback(async () => {
+    if (submitting) return;
+    if (i < total - 1) {
+      if (!canAdvance) return;
+      setI((n) => n + 1);
+      return;
+    }
+    if (!canAdvance) return;
+    await submit();
+  }, [canAdvance, i, submit, submitting, total]);
 
   const back = useCallback(() => {
     if (i > 0) setI((n) => n - 1);
   }, [i]);
+
 
   return (
     <div className="grain relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
