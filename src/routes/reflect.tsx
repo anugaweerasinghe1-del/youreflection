@@ -135,8 +135,19 @@ function ReflectPage() {
               </div>
 
               {error && (
-                <p className="mt-8 text-sm text-destructive">{error}</p>
+                <div className="mt-8 space-y-4">
+                  <p className="text-sm text-destructive">{error}</p>
+                  {i === total - 1 && (
+                    <button
+                      onClick={submit}
+                      className="inline-flex items-center gap-3 border-b border-foreground/40 pb-1 text-xs uppercase tracking-[0.3em] text-foreground transition hover:border-accent hover:text-accent"
+                    >
+                      Try again <span>→</span>
+                    </button>
+                  )}
+                </div>
               )}
+
           </div>
         )}
       </main>
