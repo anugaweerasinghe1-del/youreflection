@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText } from "ai";
+import { QUESTIONS } from "./questions";
 
 const AnswersSchema = z.record(z.string(), z.union([z.string(), z.number()]));
 
@@ -16,18 +17,22 @@ const LetterSchema = z.object({
   closing: z.string(),
 });
 
+// Loosened schema — clamp in code afterwards instead of failing validation.
 const InsightsSchema = z.object({
-  strengths: z.array(z.string()).min(3).max(6),
-  values: z.array(z.string()).min(3).max(6),
-  thoughtPatterns: z.array(z.string()).min(2).max(5),
-  growthAreas: z.array(z.string()).min(2).max(5),
-  confidenceNote: z.string(),
-  selfCompassionNote: z.string(),
-  comparisonNote: z.string(),
-  innerDialogueNote: z.string(),
+  strengths: z.array(z.string()).default([]),
+  values: z.array(z.string()).default([]),
+  thoughtPatterns: z.array(z.string()).default([]),
+  growthAreas: z.array(z.string()).default([]),
+  confidenceNote: z.string().default(""),
+  selfCompassionNote: z.string().default(""),
+  comparisonNote: z.string().default(""),
+  innerDialogueNote: z.string().default(""),
 });
 
 const OutputSchema = z.object({ letter: LetterSchema, insights: InsightsSchema });
+
+type Letter = z.infer<typeof LetterSchema>;
+type Insights = z.infer<typeof InsightsSchema>;
 
 const SYSTEM_PROMPT = `You are an emotionally intelligent reflection writer with expertise in positive psychology, self-compassion, cognitive-behavioural psychology, acceptance and commitment therapy principles, emotional intelligence and motivational interviewing.
 
@@ -37,9 +42,9 @@ Your purpose is to gently help the reader recognise patterns, discover hidden st
 
 Your writing is quiet, elegant, deeply human, warm, calm, and hopeful — the way a thoughtful mentor might write a personal letter. Prefer specificity over generality. Prefer noticing over prescribing. Prefer questions over instructions.
 
-Address the reader as "you". Keep sentences varied and unhurried. Do not repeat the reader's answers back verbatim — weave what they shared into observations. Never invent facts they didn't share.
+Address the reader as "you". Keep sentences varied and unhurried. Do not repeat the reader's answers back verbatim — weave what they shared into observations. Never invent facts they didn't share. Reference specifics they wrote — the exact phrases, the specific person, the specific tension between two of their answers.
 
-Return only valid JSON. Do not wrap it in markdown. Do not add commentary before or after the JSON.
+Return ONLY valid JSON. No markdown fences. No commentary before or after. The very first character must be { and the very last must be }.
 
 Return two things:
 
@@ -61,67 +66,247 @@ Return two things:
    - growthAreas: 2–4 gentle invitations
    - confidenceNote / selfCompassionNote / comparisonNote / innerDialogueNote: one sentence each
 
-Never mention this schema. Never break character. Never begin the letter with "Based on your answers".`;
+Never mention this schema. Never break character.`;
 
-function parseJsonObject<T>(text: string, schema: z.ZodType<T>): T {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1];
-  const candidate = fenced ?? trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("The AI response was not valid JSON.");
+const OUTPUT_SHAPE = `{"letter":{"title":"","greeting":"","reflection":"","hiddenStrengths":"","thinkingPatterns":"","gentlePerspective":"","smallChallenge":"","questionToCarry":"","closing":""},"insights":{"strengths":[],"values":[],"thoughtPatterns":[],"growthAreas":[],"confidenceNote":"","selfCompassionNote":"","comparisonNote":"","innerDialogueNote":""}}`;
+
+/* ---------- Prompt building ---------- */
+
+type AnswerMap = Record<string, string | number>;
+
+function buildUserPrompt(answers: AnswerMap): string {
+  const byCategory = new Map<string, string[]>();
+  for (const q of QUESTIONS) {
+    const raw = answers[q.id];
+    if (raw === undefined || raw === "") continue;
+    const value =
+      typeof raw === "number"
+        ? q.type === "scale"
+          ? `${raw} / ${q.max}`
+          : String(raw)
+        : String(raw).trim();
+    const line = `• ${q.prompt}\n    → ${value}`;
+    const list = byCategory.get(q.category) ?? [];
+    list.push(line);
+    byCategory.set(q.category, list);
   }
-  return schema.parse(JSON.parse(candidate.slice(start, end + 1)));
+
+  const grouped = Array.from(byCategory.entries())
+    .map(([cat, lines]) => `## ${cat}\n${lines.join("\n")}`)
+    .join("\n\n");
+
+  const signals = detectSignals(answers);
+  const signalsBlock =
+    signals.length > 0
+      ? `\n\n## Patterns worth noticing (do not quote this back — use it to inform tone)\n${signals.map((s) => `- ${s}`).join("\n")}`
+      : "";
+
+  return `Here is what the reader shared, grouped by theme. Write their reflection letter and insights. Reference the specific tensions and phrases they used — not generic observations.\n\n${grouped}${signalsBlock}\n\nReturn ONLY a JSON object with exactly this shape:\n${OUTPUT_SHAPE}`;
 }
+
+function detectSignals(answers: AnswerMap): string[] {
+  const out: string[] = [];
+  const num = (id: string): number | null => {
+    const v = answers[id];
+    return typeof v === "number" ? v : null;
+  };
+  const str = (id: string): string | null => {
+    const v = answers[id];
+    return typeof v === "string" ? v : null;
+  };
+
+  const worth = num("worth_belief");
+  const mirror = num("appearance_mirror");
+  if (worth !== null && mirror !== null && worth - mirror >= 4) {
+    out.push("Believes deeply in own inner worth, yet speaks harshly in the mirror — a tension between inner knowing and outer voice.");
+  }
+
+  const compScale = num("comparison_scale");
+  if (compScale !== null && compScale >= 7) {
+    out.push("Measures self-worth heavily against other people.");
+  }
+
+  const confScale = num("confidence_scale");
+  const roomChoice = str("confidence_room");
+  if (confScale !== null && confScale >= 7 && roomChoice === "Approval") {
+    out.push("Trusts own judgement highly in private, yet enters rooms looking for approval — private confidence vs public seeking.");
+  }
+
+  const photo = str("appearance_photo");
+  if (photo === "A loud one") {
+    out.push("First reaction to unposed photos is a loud self-critique — the inner critic is loud around appearance.");
+  }
+
+  const compFriend = str("compassion_friend");
+  if (compFriend === "Heartbroken" || compFriend === "Concerned") {
+    out.push("Would feel heartbroken or concerned if a friend spoke to themselves the way they do — the double standard is visible to them.");
+  }
+
+  const rel = str("relationships_recent");
+  if (rel === "Distant" || rel === "One-sided") {
+    out.push("Current relational landscape feels distant or one-sided.");
+  }
+
+  const purpose = str("purpose_meaning");
+  if (purpose === "Missing" || purpose === "Uncertain") {
+    out.push("Meaning feels uncertain or missing right now.");
+  }
+
+  const innerSentence = str("worth_inner_sentence");
+  if (innerSentence && innerSentence.length > 10) {
+    out.push(`Carries a specific harsh inner sentence — reference it gently, do not quote it verbatim.`);
+  }
+
+  const becoming = str("growth_becoming");
+  if (becoming && /revenge|prove|regret|underestimated|took me seriously|took him seriously|took her seriously/i.test(becoming)) {
+    out.push("The version they want to become is defined in relation to others' recognition — worth-through-vindication rather than worth-in-itself.");
+  }
+
+  return out;
+}
+
+/* ---------- JSON extraction ---------- */
+
+function extractJson(raw: string): unknown {
+  let cleaned = raw.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("no JSON object in AI output");
+  }
+  return JSON.parse(cleaned.slice(start, end + 1));
+}
+
+function clampArr(arr: string[], min: number, max: number, fallback: string[]): string[] {
+  const cleaned = arr.map((s) => (s ?? "").toString().trim()).filter(Boolean);
+  const padded = [...cleaned];
+  while (padded.length < min && fallback.length) padded.push(fallback[padded.length % fallback.length]);
+  return padded.slice(0, max);
+}
+
+function normalize(parsed: { letter: Letter; insights: Insights }): { letter: Letter; insights: Insights } {
+  return {
+    letter: parsed.letter,
+    insights: {
+      strengths: clampArr(parsed.insights.strengths, 3, 5, ["A quiet honesty", "The courage to reflect", "Care for the people you love"]),
+      values: clampArr(parsed.insights.values, 3, 5, ["Honesty", "Depth of connection", "Being truly seen"]),
+      thoughtPatterns: clampArr(parsed.insights.thoughtPatterns, 2, 4, ["A tendency to measure yourself against others", "An inner critic that speaks first"]),
+      growthAreas: clampArr(parsed.insights.growthAreas, 2, 4, ["Softening the inner voice", "Letting your worth exist before it is proven"]),
+      confidenceNote: parsed.insights.confidenceNote || "Your confidence is quieter than you think, but it is there.",
+      selfCompassionNote: parsed.insights.selfCompassionNote || "The kindness you offer others is available to you too.",
+      comparisonNote: parsed.insights.comparisonNote || "Your life measured against another's rarely tells the truth of either.",
+      innerDialogueNote: parsed.insights.innerDialogueNote || "The words you use in private shape the room you live in.",
+    },
+  };
+}
+
+/* ---------- Model chain ---------- */
+
+const MODEL_CHAIN = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "openai/gpt-5-mini",
+] as const;
+
+async function tryGenerate(
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<{ output: { letter: Letter; insights: Insights }; modelUsed: string }> {
+  const { createGateway } = await import("./ai-gateway.server");
+  const gateway = createGateway();
+
+  let lastErr: unknown = null;
+  for (const modelId of MODEL_CHAIN) {
+    try {
+      const model = gateway(modelId);
+      const { text, finishReason } = await generateText({
+        model,
+        system: systemPrompt,
+        prompt: userPrompt,
+        maxRetries: 0,
+      });
+
+      if (finishReason === "length") {
+        console.warn(`[reflection] model ${modelId} returned finishReason=length`);
+        lastErr = new Error("truncated");
+        continue;
+      }
+
+      const raw = extractJson(text);
+      const parsed = OutputSchema.parse(raw);
+      return { output: parsed, modelUsed: modelId };
+    } catch (err) {
+      lastErr = err;
+      console.error(`[reflection] model ${modelId} failed:`, err instanceof Error ? err.message : err);
+      continue;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("all models failed");
+}
+
+/* ---------- Server functions ---------- */
 
 export const generateLetter = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const parsed = z.object({ answers: AnswersSchema }).parse(data);
-    return { answers: parsed.answers };
+    return { answers: parsed.answers as AnswerMap };
   })
   .handler(async ({ data }) => {
-    const { createGateway, REFLECTION_MODEL } = await import("./ai-gateway.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userPrompt = buildUserPrompt(data.answers);
 
-    const gateway = createGateway();
-    const model = gateway(REFLECTION_MODEL);
-
-    // Format answers as readable prompt content
-    const formatted = Object.entries(data.answers)
-      .map(([id, value]) => `- ${id}: ${typeof value === "number" ? `${value}/10` : value}`)
-      .join("\n");
-
+    // Stage 1 + 2: generate + parse (with fallback chain)
+    let generated: { letter: Letter; insights: Insights };
+    let modelUsed = "unknown";
     try {
-      const { text } = await generateText({
-        model,
-        system: SYSTEM_PROMPT,
-        prompt: `Here is what the reader shared. Write their reflection letter and insights as a JSON object with exactly this shape: {"letter":{"title":"","greeting":"","reflection":"","hiddenStrengths":"","thinkingPatterns":"","gentlePerspective":"","smallChallenge":"","questionToCarry":"","closing":""},"insights":{"strengths":[],"values":[],"thoughtPatterns":[],"growthAreas":[],"confidenceNote":"","selfCompassionNote":"","comparisonNote":"","innerDialogueNote":""}}.\n\n${formatted}`,
-        maxRetries: 1,
-      });
-      const object = parseJsonObject(text, OutputSchema);
+      const result = await tryGenerate(SYSTEM_PROMPT, userPrompt);
+      generated = normalize(result.output);
+      modelUsed = result.modelUsed;
+      console.log(`[reflection] generated with ${modelUsed}`);
+    } catch (err) {
+      console.error("[reflection] all model attempts failed:", err);
+      throw new Error(
+        "Our writer is quiet right now. Please try again in a moment — your answers are safe.",
+      );
+    }
 
+    // Stage 3: persist. If DB fails, still return the letter inline.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: inserted, error } = await supabaseAdmin
         .from("reflection_sessions")
         .insert({
           answers: data.answers,
-          letter: object.letter,
-          insights: object.insights,
+          letter: generated.letter,
+          insights: generated.insights,
         })
         .select("id")
         .single();
 
       if (error || !inserted) {
-        console.error("[reflection] insert failed", error);
-        throw new Error("Could not save your reflection. Please try again.");
+        console.error("[reflection] insert failed (returning inline):", error);
+        return {
+          sessionId: null as string | null,
+          letter: generated.letter,
+          insights: generated.insights,
+          modelUsed,
+        };
       }
 
-      return { sessionId: inserted.id as string };
+      return {
+        sessionId: inserted.id as string,
+        letter: generated.letter,
+        insights: generated.insights,
+        modelUsed,
+      };
     } catch (err) {
-      console.error("[reflection] generation failed", err);
-      throw new Error(
-        "We couldn't complete your reflection right now. Please try again in a moment.",
-      );
+      console.error("[reflection] persistence error (returning inline):", err);
+      return {
+        sessionId: null as string | null,
+        letter: generated.letter,
+        insights: generated.insights,
+        modelUsed,
+      };
     }
   });
 
@@ -137,17 +322,19 @@ export const getSession = createServerFn({ method: "GET" })
 
     if (error) {
       console.error("[reflection] getSession error", error);
-      throw new Error("Could not load this reflection.");
+      throw new Error("temporarily_unavailable");
     }
-    if (!row) throw new Error("Reflection not found.");
+    if (!row) throw new Error("not_found");
 
     return {
       id: row.id as string,
-      letter: row.letter as z.infer<typeof LetterSchema>,
-      insights: row.insights as z.infer<typeof InsightsSchema>,
+      letter: row.letter as Letter,
+      insights: row.insights as Insights,
       createdAt: row.created_at as string,
     };
   });
+
+/* ---------- Wall ---------- */
 
 const MOD_SYSTEM = `You are a gentle content moderator for an anonymous reflection wall. Each entry is a single sentence a person leaves for another struggling person.
 
@@ -186,7 +373,7 @@ export const submitWallEntry = createServerFn({ method: "POST" })
         prompt: `Return JSON with exactly this shape: {"decision":"approve","reason":"","cleaned_message":""}. Message: """${data.message}"""`,
         maxRetries: 1,
       });
-      const object = parseJsonObject(text, ModSchema);
+      const object = ModSchema.parse(extractJson(text));
       decision = object.decision;
       reason = object.reason;
       cleaned = object.cleaned_message?.trim() || data.message;

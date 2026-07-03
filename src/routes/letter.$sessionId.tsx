@@ -1,8 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getSession, submitWallEntry } from "@/lib/reflection.functions";
 import { Nav } from "@/components/nav";
+
+const INLINE_KEY = "bwys.letter.inline.v1";
+
+type LetterData = Awaited<ReturnType<typeof getSession>>;
 
 export const Route = createFileRoute("/letter/$sessionId")({
   head: () => ({
@@ -16,10 +20,15 @@ export const Route = createFileRoute("/letter/$sessionId")({
     ],
   }),
   loader: async ({ params }) => {
+    // Inline preview path — data is stashed client-side, load lazily.
+    if (params.sessionId === "preview") return null;
     try {
       return await getSession({ data: { id: params.sessionId } });
-    } catch {
-      throw notFound();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "not_found") throw notFound();
+      // temporarily_unavailable or anything else: render a soft error, not a 404.
+      return { __error: true } as unknown as LetterData;
     }
   },
   component: LetterPage,
@@ -39,9 +48,79 @@ export const Route = createFileRoute("/letter/$sessionId")({
   ),
 });
 
+
+type Letter = LetterData["letter"];
+type Insights = LetterData["insights"];
+
 function LetterPage() {
-  const { letter, insights } = Route.useLoaderData();
+  const loaded = Route.useLoaderData();
+  const params = Route.useParams();
+  const [inline, setInline] = useState<{ letter: Letter; insights: Insights } | null>(null);
+  const [inlineChecked, setInlineChecked] = useState(false);
   const [tab, setTab] = useState<"letter" | "insights">("letter");
+
+  useEffect(() => {
+    if (params.sessionId !== "preview") {
+      setInlineChecked(true);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(INLINE_KEY);
+      if (raw) setInline(JSON.parse(raw));
+    } catch {}
+    setInlineChecked(true);
+  }, [params.sessionId]);
+
+  // Soft error state (temporarily unavailable)
+  if (loaded && (loaded as { __error?: boolean }).__error) {
+    return (
+      <div className="grain min-h-screen bg-background text-foreground">
+        <Nav />
+        <div className="flex min-h-[70vh] items-center justify-center px-6 text-center">
+          <div className="max-w-md">
+            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Just a moment</p>
+            <h1 className="font-display mt-6 text-4xl">Your letter is resting.</h1>
+            <p className="mt-6 text-sm text-muted-foreground">
+              We couldn't retrieve it right now. Try refreshing in a moment — nothing is lost.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-10 inline-flex border-b border-foreground/40 pb-1 text-sm uppercase tracking-[0.25em] hover:border-accent hover:text-accent"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Preview mode — waiting for inline hydration
+  if (params.sessionId === "preview" && !inlineChecked) {
+    return <div className="min-h-screen bg-background" />;
+  }
+  if (params.sessionId === "preview" && !inline) {
+    return (
+      <div className="grain min-h-screen bg-background text-foreground">
+        <Nav />
+        <div className="flex min-h-[70vh] items-center justify-center px-6 text-center">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Nothing to show</p>
+            <h1 className="font-display mt-6 text-4xl">This preview has ended.</h1>
+            <Link
+              to="/reflect"
+              className="mt-10 inline-flex border-b border-foreground/40 pb-1 text-sm uppercase tracking-[0.25em] hover:border-accent hover:text-accent"
+            >
+              Begin a new reflection
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const letter: Letter = inline?.letter ?? (loaded as LetterData).letter;
+  const insights: Insights = inline?.insights ?? (loaded as LetterData).insights;
 
   return (
     <div className="grain min-h-screen bg-background text-foreground">
@@ -75,7 +154,7 @@ function LetterPage() {
         </div>
 
         <div className="mt-16">
-          {tab === "letter" ? <LetterBody letter={letter} /> : <Insights insights={insights} />}
+          {tab === "letter" ? <LetterBody letter={letter} /> : <InsightsView insights={insights} />}
         </div>
       </section>
 
@@ -94,7 +173,8 @@ function LetterPage() {
   );
 }
 
-function LetterBody({ letter }: { letter: ReturnType<typeof Route.useLoaderData>["letter"] }) {
+function LetterBody({ letter }: { letter: Letter }) {
+
   const sections: Array<{ label: string; body: string; italic?: boolean }> = [
     { label: "", body: letter.greeting, italic: true },
     { label: "Reflection", body: letter.reflection },
@@ -129,7 +209,7 @@ function LetterBody({ letter }: { letter: ReturnType<typeof Route.useLoaderData>
   );
 }
 
-function Insights({ insights }: { insights: ReturnType<typeof Route.useLoaderData>["insights"] }) {
+function InsightsView({ insights }: { insights: Insights }) {
   const cards: Array<{ title: string; kind: "list" | "note"; body: string[] | string }> = [
     { title: "Strengths", kind: "list", body: insights.strengths },
     { title: "Values", kind: "list", body: insights.values },
