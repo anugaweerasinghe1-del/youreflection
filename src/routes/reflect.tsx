@@ -117,6 +117,17 @@ function ReflectPage() {
 
   return (
     <div className="grain relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Warm, subtle ambient layer — kept far behind text, low opacity, blurred. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <img
+          src={sectionWindow}
+          alt=""
+          className="h-full w-full scale-110 object-cover opacity-[0.09] blur-3xl"
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_oklch(0.78_0.08_80/0.10),_transparent_55%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/70 to-background" />
+      </div>
+
       <TopBar current={i} total={total} onExit={() => navigate({ to: "/" })} />
 
       <main className="relative flex flex-1 items-center justify-center px-6 py-32 md:px-10">
