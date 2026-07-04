@@ -350,15 +350,33 @@ function HowItWorks() {
   );
 }
 
-/* ---------- Section 6: Community preview ---------- */
+/* ---------- Section 6: Living wall ---------- */
+
+const FALLBACK_LINES = [
+  "I wish I believed compliments as easily as criticism.",
+  "I've spent years trying to become someone else.",
+  "I forgot that I was enough.",
+  "The kindest voice I've ever heard is the one I rarely use on myself.",
+  "I'm learning that quiet isn't the same as empty.",
+  "Some days, being gentle with myself is the whole task.",
+];
 
 function CommunityPreview() {
-  const lines = [
-    "I wish I believed compliments as easily as criticism.",
-    "I've spent years trying to become someone else.",
-    "I forgot that I was enough.",
-    "The kindest voice I've ever heard is the one I rarely use on myself.",
-  ];
+  const list = useServerFn(listWallEntries);
+  const { data } = useQuery({
+    queryKey: ["wall", "home"],
+    queryFn: () => list(),
+    staleTime: 60_000,
+  });
+
+  const remote = (data?.entries ?? []).map((e) => e.message).filter(Boolean);
+  const lines = remote.length >= 4 ? remote.slice(0, 24) : FALLBACK_LINES;
+
+  // Split into two rows for the opposing marquees.
+  const mid = Math.ceil(lines.length / 2);
+  const rowA = lines.slice(0, mid);
+  const rowB = lines.slice(mid).length >= 2 ? lines.slice(mid) : lines.slice(0, mid);
+
   return (
     <section className="relative overflow-hidden bg-background py-40 md:py-56">
       <div className="mx-auto max-w-7xl px-6 md:px-10">
@@ -369,17 +387,24 @@ function CommunityPreview() {
             left by strangers, for strangers.
           </h2>
         </Reveal>
-        <div className="mt-24 space-y-16 md:space-y-24">
-          {lines.map((l, i) => (
-            <Reveal key={i} delay={i * 0.1}>
-              <blockquote className="font-display max-w-4xl text-[clamp(1.5rem,3vw,2.5rem)] italic leading-snug text-balance text-foreground/90">
-                &ldquo;{l}&rdquo;
-              </blockquote>
-            </Reveal>
-          ))}
-        </div>
-        <Reveal delay={0.2}>
-          <div className="mt-24">
+
+        <Reveal delay={0.15}>
+          <div className="group relative mt-20 h-[520px] overflow-hidden md:h-[600px]">
+            {/* top/bottom fade masks */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-gradient-to-b from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-background to-transparent" />
+
+            <div className="grid h-full grid-cols-1 gap-8 md:grid-cols-2 md:gap-16">
+              <MarqueeColumn lines={rowA} direction="up" />
+              <div className="hidden md:block">
+                <MarqueeColumn lines={rowB} direction="down" />
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        <Reveal delay={0.25}>
+          <div className="mt-20">
             <Link
               to="/wall"
               className="inline-flex items-center gap-4 border-b border-foreground/30 pb-2 text-sm uppercase tracking-[0.25em] text-muted-foreground transition hover:border-foreground hover:text-foreground"
@@ -391,6 +416,35 @@ function CommunityPreview() {
         </Reveal>
       </div>
     </section>
+  );
+}
+
+function MarqueeColumn({
+  lines,
+  direction,
+}: {
+  lines: string[];
+  direction: "up" | "down";
+}) {
+  // Duplicate the list so the CSS translate loop is seamless.
+  const doubled = [...lines, ...lines];
+  return (
+    <div className="relative h-full overflow-hidden">
+      <div
+        className={`flex flex-col gap-12 will-change-transform ${
+          direction === "up" ? "animate-marquee-up" : "animate-marquee-down"
+        } group-hover:[animation-play-state:paused]`}
+      >
+        {doubled.map((l, i) => (
+          <blockquote
+            key={`${i}-${l.slice(0, 12)}`}
+            className="font-display max-w-md text-[clamp(1.2rem,1.8vw,1.75rem)] italic leading-snug text-balance text-foreground/85"
+          >
+            &ldquo;{l}&rdquo;
+          </blockquote>
+        ))}
+      </div>
+    </div>
   );
 }
 
