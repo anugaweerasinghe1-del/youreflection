@@ -156,9 +156,26 @@
   animation: pulse-line 2.4s ease-in-out infinite;
 }
 
+@keyframes marquee-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes marquee-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+@utility animate-marquee-up {
+  animation: marquee-up 80s linear infinite;
+}
+@utility animate-marquee-down {
+  animation: marquee-down 95s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
-  .animate-pulse-line {
+  .animate-pulse-line,
+  .animate-marquee-up,
+  .animate-marquee-down {
     animation: none;
   }
 }

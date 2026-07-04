@@ -1,85 +1,70 @@
-# Fix "results say error" + viral roadmap
+# Plan — Living wall, warmer questions, safer answers
 
-## 1. What the scan actually found
+Three focused changes. Nothing removed, nothing renamed, nothing that touches AI generation, DB schema, routing, or the homepage hero. Every change is additive or in-place.
 
-I traced the full flow — landing, reflect, generate, letter, wall — and cross-checked AI Gateway logs, the DB, and the server code.
+## 1. Living wall on the homepage (privacy-safe, cinematic)
 
-**The real failure (why users see "error, no results"):**
+Replace the current static `CommunityPreview` section with an auto-scrolling "living wall" — keeps the exact same section slot (05 — Others, quietly) and the "Visit the wall" link, so nothing about page structure changes.
 
-- The gateway call to Gemini yesterday **succeeded** — valid JSON, all fields present (log `019f2386…`, 200 OK, 674 output tokens).
-- The `reflection_sessions` table is **empty** — the Supabase insert that follows the AI call never landed a row.
-- The whole handler is wrapped in one `try/catch` that swallows *every* error (AI, JSON parse, Zod validation, DB insert) and rethrows one generic string: *"We couldn't complete your reflection right now."* So users see failure with zero signal, and we couldn't tell what actually broke. That single catch-all is the biggest UX bug.
-- Server-function logs only retain ~1h, so the specific insert error from yesterday is gone. But the pattern is clear: even a valid AI response can't reach the user because one unrelated failure kills the whole flow.
+- New client component `LivingWall` (same file, `src/routes/index.tsx`) — pulls approved entries via the existing `listWallEntries` server fn using `useQuery`.
+- Fallback to the existing 4 hand-written lines when the list is empty or still loading, so the section never looks broken.
+- Two vertically-stacked marquee rows, opposite directions, very slow (~60–90s per loop), CSS-only transform animation (no JS timers, no libs). Pauses on hover.
+- Edge fade masks (top/bottom) so lines drift in and out cinematically.
+- Privacy-safe: only shows already-approved wall entries (same source the `/wall` page uses) — no new data path, no PII.
+- Respects `prefers-reduced-motion` (freezes the scroll).
+- Kept short: one section, no layout shift; the "Visit the wall" CTA stays exactly where it is.
 
-**Other issues found:**
-- No fallback model — a single Gemini timeout / rate limit / safety block = total failure.
-- No retry, no partial recovery, and the AI output isn't cached, so a downstream DB hiccup wastes the entire generation.
-- Prompt is generic across users — answers are just dumped as `id: value`. The letter feels less "personal" than it should.
-- `generateText` is called with `maxRetries: 1` and no `maxTokens` — Gemini can silently truncate long JSON.
-- Insights Zod schema uses hard `.min(3).max(6)` bounds; if the model returns 2 or 7 items the whole run fails validation and the user gets nothing.
+## 2. Warmer, less-empty reflect page
 
-## 2. Fix plan (server-side)
+The questions page currently sits on plain `bg-background` with just text.
 
-**a. Split the try/catch into stages with distinct errors**
-- Stage 1: AI generation → on failure, try fallback model.
-- Stage 2: JSON parse + Zod validation → on failure, retry once with a stricter "return ONLY JSON" reminder, then fallback.
-- Stage 3: DB insert → on failure, still return the generated letter to the client via an in-memory/edge-cache short-lived signed payload so the user is never punished for a DB blip. Log the real error server-side.
-- Each stage logs a specific reason so we can debug from `server-function-logs` next time.
+- Add a subtle, fixed background layer behind the questions in `src/routes/reflect.tsx`:
+  - One of the existing hero images (`section-window.jpg` / `section-reflection.jpg`) used at very low opacity (~8–12%), heavily blurred, with a strong background gradient overlay on top so text contrast is unchanged.
+  - A soft radial "warm glow" using existing accent tokens (no new colors).
+  - Optional very subtle grain (already available via `.grain`).
+- No change to text sizes, layout, TopBar/BottomBar, or the `Composing` state.
+- No new assets required — reuses images already imported elsewhere.
 
-**b. Fallback LLM chain**
-Primary: `google/gemini-3-flash-preview` (fast, current).
-Fallback 1: `google/gemini-2.5-flash` (stable, proven).
-Fallback 2: `openai/gpt-5-mini` (different provider entirely — dodges Gemini-wide outages / safety false-positives).
-Order tried only on failure; success on first model returns immediately. Both fallbacks use the same prompt.
+## 3. Softer questions + "type your own answer"
 
-**c. Loosen the schema, clamp in code**
-Remove `.min/.max` from arrays in the Zod schema. Instead, after parsing, clamp arrays to 3–6 / 2–5 items and pad with safe defaults if too short. A well-formed letter should never be thrown away because it has 2 growth areas instead of 3.
+Rewrite `src/lib/questions.ts` in place — same 15 items, same ids, same categories, same types, so the AI prompt, `detectSignals()`, and `sessionStorage` all keep working unchanged.
 
-**d. Set `maxOutputTokens` and detect truncation**
-Pass `maxTokens: 2048` on the generation, and if `finishReason === "length"` treat as a soft failure and trigger fallback with a shorter prompt.
+Changes per question:
+- Reword a handful of prompts that lean too hard on empathy/therapy tone into more neutral, curious phrasing (e.g. "How gently do you speak to yourself in the mirror" → "When you look in the mirror, your inner voice is usually…").
+- Rewrite the choice options that are too specific/opaque (e.g. `photo` → "Warmth / Neutral / A small critique / A loud one" → simpler, clearer options).
+- Keep all ids and categories identical so `detectSignals()` string matches (e.g. `"A loud one"`, `"Approval"`, `"Heartbroken"`, `"Missing"`, `"Distant"`) still fire — where I reword an option that's used in `detectSignals`, I'll keep the exact string for that option and only reword its siblings.
 
-**e. Real personalization**
-Currently the prompt sends `identity_notice: my heart`. Change the prompt builder to:
-- Group answers by category (Identity, Confidence, Comparison, Self-worth, etc.).
-- Include the actual question prompt, not just the id, so the model sees "When you enter a room of strangers, your mind first looks for: Approval" instead of `confidence_room: Approval`.
-- Add a short "priority signals" block computed server-side (e.g. detected patterns: "high self-worth score but harsh mirror talk", "seeks approval but trusts own judgement") so the letter references the *specific tension* in that user's answers.
-- Vary the greeting seed with a hash of answers so two people don't get identical openings.
+Then add an "Other — write your own" affordance for every `choice` question:
 
-**f. Never show raw "error" to the user**
-On total failure, show a real, human message ("Our writer is quiet right now — try again in a moment") and offer a *retry* button that reuses the already-collected answers from sessionStorage without asking them to redo the 15 questions.
+- Extend `ChoiceInput` in `src/routes/reflect.tsx` only (no schema change): after the option buttons, render an "Other" button. When picked, it swaps into a small inline text field; the typed string becomes the answer value (still a string, so the server, prompt builder, and validators are unaffected).
+- Answer type stays `string | number`, `AnswersSchema` unchanged, DB row shape unchanged.
+- `canAdvance` treats an "Other" with ≥2 chars as valid.
 
-## 3. Fix plan (client-side)
+## 4. Safety net — nothing breaks
 
-- On `/reflect` submit failure: keep answers in `sessionStorage`, show a "Try again" button that re-calls `generateLetter` without losing state. Currently the user has to restart mentally.
-- On `/letter/$sessionId` loader failure: distinguish "not found" (bad link) vs "temporarily unavailable" (server error) instead of always throwing `notFound()`.
-- Add a subtle "regenerate letter" affordance on the letter page (once), for users who want a second pass.
+I will:
 
-## 4. Verification
+- Not touch: routing, `routeTree.gen.ts`, Supabase schema, RLS, server fns, AI code, auth, `__root.tsx`, wall route, letter route, `ai-gateway.server.ts`.
+- Keep every question id + category + type stable so `detectSignals`, the prompt builder, and existing in-flight `sessionStorage` answers still work.
+- Keep every choice option string that `detectSignals` matches on ("A loud one", "Approval", "Heartbroken", "Concerned", "Distant", "One-sided", "Missing", "Uncertain") verbatim, only softening surrounding wording.
+- After edits: run `tsgo` typecheck, load `/`, `/reflect`, `/wall` via Playwright, screenshot each, and verify no console errors + the wall query returns.
+- Report back honestly: what shipped, what I skipped, and any warnings.
 
-- Manually invoke `generateLetter` with a fixed answer set via `invoke-server-function` and confirm a `reflection_sessions` row lands.
-- Force the primary model to fail (bad model id) and confirm the fallback returns a valid letter.
-- Force the DB insert to fail (temporary table rename in a scratch env) and confirm the client still receives a letter and shows a friendly recoverable state.
-- Re-run the full flow in Playwright: reflect → submit → letter renders with real content.
+## Technical notes
 
-## 5. World-class / viral additions (my strongest picks)
+- Living wall marquee: two `@keyframes` (`marquee-left`, `marquee-right`) added to `src/styles.css`, applied to a duplicated list (`[...entries, ...entries]`) inside `overflow-hidden` containers with `mask-image` fades. Pause via `group-hover:[animation-play-state:paused]`.
+- Reflect background layer: absolute-positioned `<div>` inside the existing `grain` wrapper, `pointer-events-none`, behind `<main>`; image `object-cover`, `blur-3xl`, `opacity-10`, plus a `bg-gradient-to-b from-background via-background/85 to-background` overlay.
+- Choice "Other": local component state (`customValue`, `mode: "options" | "custom"`); when the parent `value` matches one of the preset options, mode is `options`, otherwise `custom`. This survives back-navigation via existing `sessionStorage` hydration.
 
-Ranked by likely virality × fit with the "quiet, cinematic, anonymous" brand:
+## Files touched
 
-1. **Shareable "Letter Card"** — from the letter page, generate a beautiful vertical image (server-side, using Gemini image or a canvas render) containing just the *title* + *questionToCarry* + a signature line "beyondwhatyousee.app". One tap → download / share to IG story / X. This is *the* virality driver: every letter becomes a share asset with brand attribution, no personal data leaked.
-2. **"Send this to someone" quiet gift** — instead of only sharing your own letter, let a user compose a 15-second reflection *for* a friend (anonymous, no account) that generates a one-off letter link. Word-of-mouth loop, same infra.
-3. **The Wall, alive** — right now the wall is static. Make it a slow, cinematic auto-scrolling wall (like a night sky) where each sentence fades in on scroll, with a live count of "reflections written today". Social proof + return visits.
-4. **Return ritual (weekly)** — an optional, no-account "come back Sunday" — user gets a shareable link with a single question to sit with for the week, tied to their letter's `questionToCarry`. Retention without emails.
-5. **Voice mode** — read the letter aloud with Lovable AI text-to-speech, quiet piano bed. People screen-record and repost audio-letter videos on TikTok.
-6. **"Two of you" comparison** — take the reflection twice, months apart, and see a soft side-by-side of how your inner sentences shifted. Deep emotional hook, drives repeat use.
-7. **Language expansion** — the letter reads beautifully in many languages; add a language toggle so it's not English-only. Multiplies virality per market.
-8. **Zero-friction landing hook** — the current hero is gorgeous but slow. Add one interactive line above the fold: "One sentence. What do you wish people saw in you?" → immediately drops them into the reflection. Shortens time-to-magic-moment.
+- `src/routes/index.tsx` — replace `CommunityPreview` body with `LivingWall`; keep heading + CTA.
+- `src/routes/reflect.tsx` — add background layer div; extend `ChoiceInput` with "Other".
+- `src/lib/questions.ts` — reword prompts/options in place; same ids/types.
+- `src/styles.css` — add `@keyframes marquee-left/right` + two utility classes.
 
-I'll ship #1, #3 (upgrade), and the reflection fixes in this pass, with #2 and #5 as immediate follow-ups if you approve.
+## Out of scope this pass
 
-## Implementation order
-
-1. Server: staged errors + fallback chain + schema loosening + richer prompt.
-2. Client: retryable submit + friendlier letter-page errors.
-3. Verify with real invoke + Playwright.
-4. Ship shareable letter card + wall upgrade.
-5. Report back with a list of what changed and what to try next for growth.
+- No changes to letter generation, model chain, DB, or the `/wall` page itself.
+- No new images generated.
+- No new dependencies.

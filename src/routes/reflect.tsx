@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QUESTIONS, type Question } from "@/lib/questions";
 import { generateLetter } from "@/lib/reflection.functions";
+import sectionWindow from "@/assets/section-window.jpg";
 
 export const Route = createFileRoute("/reflect")({
   head: () => ({
@@ -59,7 +60,7 @@ function ReflectPage() {
     q.type === "text"
       ? typeof value === "string" && value.trim().length >= 2
       : q.type === "choice"
-        ? typeof value === "string"
+        ? typeof value === "string" && value.trim().length >= 1
         : typeof value === "number";
 
   const setValue = useCallback(
@@ -116,6 +117,17 @@ function ReflectPage() {
 
   return (
     <div className="grain relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Warm, subtle ambient layer — kept far behind text, low opacity, blurred. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <img
+          src={sectionWindow}
+          alt=""
+          className="h-full w-full scale-110 object-cover opacity-[0.09] blur-3xl"
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_oklch(0.78_0.08_80/0.10),_transparent_55%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/70 to-background" />
+      </div>
+
       <TopBar current={i} total={total} onExit={() => navigate({ to: "/" })} />
 
       <main className="relative flex flex-1 items-center justify-center px-6 py-32 md:px-10">
@@ -239,14 +251,39 @@ function ChoiceInput({
   value: string | undefined;
   onChange: (v: string) => void;
 }) {
+  const isCustom =
+    typeof value === "string" && value.length > 0 && !options.includes(value);
+  const [customMode, setCustomMode] = useState(isCustom);
+  const [customText, setCustomText] = useState(isCustom ? (value as string) : "");
+  const customRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync when the parent value changes (e.g. hydrated from sessionStorage
+  // or user navigated back to this question).
+  useEffect(() => {
+    const nowCustom =
+      typeof value === "string" && value.length > 0 && !options.includes(value);
+    setCustomMode(nowCustom);
+    if (nowCustom) setCustomText(value as string);
+  }, [value, options]);
+
+  const enterCustom = () => {
+    setCustomMode(true);
+    setCustomText((prev) => (prev.length ? prev : ""));
+    onChange(customText.trim());
+    setTimeout(() => customRef.current?.focus(), 0);
+  };
+
   return (
     <div className="flex flex-col gap-3">
       {options.map((o) => {
-        const active = value === o;
+        const active = !customMode && value === o;
         return (
           <button
             key={o}
-            onClick={() => onChange(o)}
+            onClick={() => {
+              setCustomMode(false);
+              onChange(o);
+            }}
             className={`group flex items-center justify-between border-b border-border px-1 py-5 text-left transition ${
               active ? "border-accent" : "hover:border-foreground/40"
             }`}
@@ -266,6 +303,46 @@ function ChoiceInput({
           </button>
         );
       })}
+
+      {/* Other — write your own */}
+      {!customMode ? (
+        <button
+          onClick={enterCustom}
+          className="group flex items-center justify-between border-b border-dashed border-border px-1 py-5 text-left transition hover:border-foreground/40"
+        >
+          <span className="font-display text-2xl italic text-foreground/60 transition group-hover:text-foreground/90 md:text-3xl">
+            Something else — write your own
+          </span>
+          <span className="text-xs uppercase tracking-[0.3em] text-muted-foreground group-hover:text-foreground/80">
+            + Other
+          </span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 border-b border-accent px-1 py-4">
+          <input
+            ref={customRef}
+            type="text"
+            value={customText}
+            maxLength={140}
+            placeholder="In your own words…"
+            onChange={(e) => {
+              setCustomText(e.target.value);
+              onChange(e.target.value.trim());
+            }}
+            className="w-full border-0 bg-transparent font-display text-2xl text-foreground placeholder:italic placeholder:text-muted-foreground/60 focus:outline-none md:text-3xl"
+          />
+          <button
+            onClick={() => {
+              setCustomMode(false);
+              setCustomText("");
+              onChange("");
+            }}
+            className="text-xs uppercase tracking-[0.3em] text-muted-foreground transition hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }
