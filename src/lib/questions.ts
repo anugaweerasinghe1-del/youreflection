@@ -18,52 +18,68 @@ export type Question =
       maxLabel?: string;
     };
 
-// 15 carefully written prompts — thoughtful, non-clinical, non-judgemental.
-// Balanced for completion: quick choices and scales first, with a few meaningful written reflections.
+// 15 prompts. Softer, more curious tone — less therapy, more conversation.
+// IDs, categories, types, and any option string referenced by detectSignals()
+// (`A loud one`, `Approval`, `Heartbroken`, `Concerned`, `Distant`,
+// `One-sided`, `Missing`, `Uncertain`) are kept verbatim.
 export const QUESTIONS: Question[] = [
   { id: "identity_notice", category: "Identity", type: "text",
-    prompt: "What is something you wish people noticed about you beyond your appearance?",
-    placeholder: "A quality. A struggle. A quiet truth." },
+    prompt: "What's something about you that people usually miss at first?",
+    placeholder: "A quality, a habit, a small truth." },
+
   { id: "appearance_photo", category: "Appearance", type: "choice",
-    prompt: "When you see yourself in an unposed photo, your first reaction is usually…",
-    options: ["Warmth", "Neutral", "A small critique", "A loud one"] },
+    prompt: "You catch yourself in a candid photo. Your first thought is…",
+    options: ["Kind of like it", "Nothing much", "A small critique", "A loud one"] },
+
   { id: "appearance_mirror", category: "Appearance", type: "scale",
-    prompt: "How gently do you speak to yourself in the mirror?",
-    min: 1, max: 10, minLabel: "Rarely gentle", maxLabel: "Almost always gentle" },
+    prompt: "When you look in the mirror, how kind is your inner voice?",
+    min: 1, max: 10, minLabel: "Rarely kind", maxLabel: "Almost always kind" },
+
   { id: "confidence_room", category: "Confidence", type: "choice",
-    prompt: "When you enter a room of strangers, your mind first looks for…",
-    options: ["Connection", "Safety", "Approval", "A way out"] },
+    prompt: "You walk into a room full of strangers. You're mostly looking for…",
+    options: ["Someone to connect with", "A quiet spot", "Approval", "The exit"] },
+
   { id: "confidence_scale", category: "Confidence", type: "scale",
-    prompt: "How often do you trust your own judgement without needing outside approval?",
+    prompt: "How often do you trust your own call without checking with someone else?",
     min: 1, max: 10, minLabel: "Rarely", maxLabel: "Almost always" },
+
   { id: "comparison_scroll", category: "Comparison", type: "choice",
-    prompt: "After seeing other people's lives online, you usually feel…",
-    options: ["Inspired", "Unaffected", "A little behind", "Not enough"] },
+    prompt: "After a long scroll through other people's lives, you usually feel…",
+    options: ["Inspired", "Pretty unaffected", "A little behind", "Not enough"] },
+
   { id: "comparison_scale", category: "Comparison", type: "scale",
-    prompt: "How much of your self-worth is measured against other people?",
-    min: 1, max: 10, minLabel: "Not much", maxLabel: "A great deal" },
+    prompt: "How much do you measure yourself against other people?",
+    min: 1, max: 10, minLabel: "Barely", maxLabel: "A lot" },
+
   { id: "relationships_recent", category: "Relationships", type: "choice",
-    prompt: "Lately, most of your relationships feel…",
+    prompt: "Your close relationships lately feel mostly…",
     options: ["Nourishing", "Steady", "One-sided", "Distant"] },
+
   { id: "relationships_seen", category: "Relationships", type: "text",
-    prompt: "Who makes you feel most seen — and what do they notice?",
-    placeholder: "No names needed. Just what they make room for." },
+    prompt: "Who makes you feel most yourself — and what do they seem to see?",
+    placeholder: "No names needed." },
+
   { id: "worth_belief", category: "Self-worth", type: "scale",
-    prompt: "How much do you believe you're already worthy — before you achieve anything else?",
+    prompt: "How much do you feel you're already enough, before achieving anything more?",
     min: 1, max: 10, minLabel: "Not really", maxLabel: "Deeply" },
+
   { id: "worth_inner_sentence", category: "Self-worth", type: "text",
-    prompt: "What is a sentence you tell yourself often that might not actually be true?",
-    placeholder: "Write the sentence exactly as it appears." },
+    prompt: "Is there a sentence you tell yourself a lot that might not actually be true?",
+    placeholder: "Write it however it shows up." },
+
   { id: "purpose_meaning", category: "Purpose", type: "choice",
     prompt: "Right now, meaning in your life feels…",
-    options: ["Clear", "Emerging", "Uncertain", "Missing"] },
+    options: ["Clear", "Slowly forming", "Uncertain", "Missing"] },
+
   { id: "growth_becoming", category: "Growth", type: "text",
-    prompt: "Who are you quietly trying to become?",
-    placeholder: "A version of you, not a performance." },
+    prompt: "Who are you quietly working on becoming?",
+    placeholder: "A version of you — not a performance." },
+
   { id: "compassion_friend", category: "Self-Compassion", type: "choice",
-    prompt: "If a friend spoke to themselves the way you speak to yourself, you would feel…",
-    options: ["Proud", "Protective", "Concerned", "Heartbroken"] },
+    prompt: "If a close friend talked to themselves the way you talk to yourself, you'd feel…",
+    options: ["Proud of them", "Protective", "Concerned", "Heartbroken"] },
+
   { id: "compassion_permission", category: "Self-Compassion", type: "text",
-    prompt: "What is one thing you rarely give yourself permission to feel?",
-    placeholder: "Keep it simple." },
+    prompt: "What's one feeling you rarely let yourself have?",
+    placeholder: "Keep it short if you want." },
 ];
