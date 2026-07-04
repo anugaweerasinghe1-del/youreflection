@@ -251,14 +251,39 @@ function ChoiceInput({
   value: string | undefined;
   onChange: (v: string) => void;
 }) {
+  const isCustom =
+    typeof value === "string" && value.length > 0 && !options.includes(value);
+  const [customMode, setCustomMode] = useState(isCustom);
+  const [customText, setCustomText] = useState(isCustom ? (value as string) : "");
+  const customRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync when the parent value changes (e.g. hydrated from sessionStorage
+  // or user navigated back to this question).
+  useEffect(() => {
+    const nowCustom =
+      typeof value === "string" && value.length > 0 && !options.includes(value);
+    setCustomMode(nowCustom);
+    if (nowCustom) setCustomText(value as string);
+  }, [value, options]);
+
+  const enterCustom = () => {
+    setCustomMode(true);
+    setCustomText((prev) => (prev.length ? prev : ""));
+    onChange(customText.trim());
+    setTimeout(() => customRef.current?.focus(), 0);
+  };
+
   return (
     <div className="flex flex-col gap-3">
       {options.map((o) => {
-        const active = value === o;
+        const active = !customMode && value === o;
         return (
           <button
             key={o}
-            onClick={() => onChange(o)}
+            onClick={() => {
+              setCustomMode(false);
+              onChange(o);
+            }}
             className={`group flex items-center justify-between border-b border-border px-1 py-5 text-left transition ${
               active ? "border-accent" : "hover:border-foreground/40"
             }`}
@@ -278,6 +303,46 @@ function ChoiceInput({
           </button>
         );
       })}
+
+      {/* Other — write your own */}
+      {!customMode ? (
+        <button
+          onClick={enterCustom}
+          className="group flex items-center justify-between border-b border-dashed border-border px-1 py-5 text-left transition hover:border-foreground/40"
+        >
+          <span className="font-display text-2xl italic text-foreground/60 transition group-hover:text-foreground/90 md:text-3xl">
+            Something else — write your own
+          </span>
+          <span className="text-xs uppercase tracking-[0.3em] text-muted-foreground group-hover:text-foreground/80">
+            + Other
+          </span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 border-b border-accent px-1 py-4">
+          <input
+            ref={customRef}
+            type="text"
+            value={customText}
+            maxLength={140}
+            placeholder="In your own words…"
+            onChange={(e) => {
+              setCustomText(e.target.value);
+              onChange(e.target.value.trim());
+            }}
+            className="w-full border-0 bg-transparent font-display text-2xl text-foreground placeholder:italic placeholder:text-muted-foreground/60 focus:outline-none md:text-3xl"
+          />
+          <button
+            onClick={() => {
+              setCustomMode(false);
+              setCustomText("");
+              onChange("");
+            }}
+            className="text-xs uppercase tracking-[0.3em] text-muted-foreground transition hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }
