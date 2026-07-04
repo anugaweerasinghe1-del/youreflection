@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Nav } from "@/components/nav";
+import { listWallEntries } from "@/lib/reflection.functions";
 import heroPortrait from "@/assets/hero-portrait.jpg";
 import sectionReflection from "@/assets/section-reflection.jpg";
 import sectionHands from "@/assets/section-hands.jpg";
