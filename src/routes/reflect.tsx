@@ -60,7 +60,7 @@ function ReflectPage() {
     q.type === "text"
       ? typeof value === "string" && value.trim().length >= 2
       : q.type === "choice"
-        ? typeof value === "string"
+        ? typeof value === "string" && value.trim().length >= 1
         : typeof value === "number";
 
   const setValue = useCallback(
