@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QUESTIONS, type Question } from "@/lib/questions";
 import { generateLetter } from "@/lib/reflection.functions";
+import sectionWindow from "@/assets/section-window.jpg";
 
 export const Route = createFileRoute("/reflect")({
   head: () => ({
